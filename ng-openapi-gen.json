@@ -1,0 +1,9 @@
+{
+  "$schema": "node_modules/ng-openapi-gen/ng-openapi-gen-schema.json",
+  "input": "src/swagger.yaml",
+  "output": "src/app/core/api/client",
+  "ignoreUnusedModels": false,
+  "services": true,
+  "promises": false,
+  "defaultRootUrl": "/api"
+}

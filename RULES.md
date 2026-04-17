@@ -1,0 +1,294 @@
+## Наименование файлов
+
+Все файлы именуются в стиле `kebab-case` с обязательным указанием типа сущности.
+
+| Сущность           | Суффикс файла     | Пример                   |
+|:-------------------|:------------------|:-------------------------|
+| Компонент          | `.component.ts`   | `user-list.component.ts` |
+| Сервис             | `.service.ts`     | `auth.service.ts`        |
+| Стор (SignalStore) | `.store.ts`       | `orders.store.ts`        |
+| Модель (Интерфейс) | `.model.ts`       | `invoice.model.ts`       |
+| Интерцептор        | `.interceptor.ts` | `auth.interceptor.ts`    |
+| Гвард              | `.guard.ts`       | `admin.guard.ts`         |
+
+## Стейт-менеджер
+
+В качестве стейт-менеджера используется библиотека **`@ngrx/signals`**.
+
+Мы выбрали этот инструмент по следующим причинам:
+
+1. **Нативная поддержка DI (Dependency Injection)**: Как и обычные сервисы, конкретный store можно сделать глобальным (`providedIn: 'root'`) или инжектировать локально на уровне конкретного компонента/фичи.
+2. **Основа на Angular Signals**: Гарантирует максимально быстрое, точечное и предсказуемое обновление UI без ручного управления подписками.
+3. **Хуки жизненного цикла (`withHooks`)**: Позволяет управлять стором через `onInit` и `onDestroy`, повторяя жизненный цикл компонента и автоматизируя стартовую загрузку или очистку данных.
+4. **Ленивые вычисления (`withComputed`)**: Идеально подходит для кэширования тяжелых вычислений. Значения пересчитываются лениво и только тогда, когда изменяются зависимые от них сигналы.
+5. **Изолированная работа с RxJS (`withMethods` + `rxMethod`)**: Позволяет обрабатывать потоки данных (асинхронные запросы, маппинг, дебаунс, обработка ошибок) внутри стора, используя операторы RxJS, оставляя компоненты абсолютно чистыми.
+
+### Пример реализации (SignalStore)
+
+Ниже представлен минимальный пример стора, демонстрирующий все описанные выше концепции в одном лаконичном пайплайне:
+
+```typescript
+import { computed, inject } from '@angular/core';
+import { signalStore, withState, withComputed, withMethods, withHooks, patchState } from '@ngrx/signals';
+import { rxMethod } from '@ngrx/signals/rxjs-interop';
+import { pipe, switchMap, tap } from 'rxjs';
+import { UsersService } from './users.service';
+
+// Описание стейта
+interface UsersState {
+  users: User[];
+  isLoading: boolean;
+}
+
+const initialState: UsersState = {
+  users: [],
+  isLoading: false,
+};
+
+// 6. Композиция функций (миксинов) вместо Redux-бойлерплейта
+export const UsersStore = signalStore(
+  { providedIn: 'root' }, // 1. Глобальный DI
+  
+  withState(initialState), // 2. Сигналы под капотом
+  
+  withComputed(({ users }) => ({
+    // 4. Кэшируемые ленивые вычисления
+    activeUsers: computed(() => users().filter(u => u.isActive)),
+  })),
+  
+  withMethods((store, usersService = inject(UsersService)) => ({
+    // 5. Обработка потоков через RxJS изолированно от UI
+    loadUsers: rxMethod<void>(
+      pipe(
+        tap(() => patchState(store, { isLoading: true })),
+        switchMap(() => usersService.fetchUsers().pipe(
+          tap((users) => patchState(store, { users, isLoading: false }))
+        ))
+      )
+    )
+  })),
+  
+  withHooks({
+    // 3. Управление жизненным циклом
+    onInit(store) {
+      store.loadUsers(); // Автоматически загружаем при инициализации стора
+    }
+  })
+);
+```
+
+## Архитектура
+
+Основные принципы построения логики и взаимодействия компонентов:
+
+1. **Signals > RxJS**: Сигналы используются как основной механизм управления состоянием и синхронизации UI. RxJS применяется точечно — там, где это необходимо (асинхронные потоки, работа с API, обработка событий).
+2. **Smart-компоненты**: Вся логика получения данных из сервисов или сторов сосредоточена в "умных" компонентах (или резолверах). Презентационные компоненты только отображают данные.
+3. **Изоляция API**: Вызовы к API инкапсулированы строго внутри сервисов. Компоненты никогда не используют `HttpClient` напрямую.
+4. **Статус сервисов**: Сервисы работают по принципу **Stateless (чистые функции)**. Они не хранят данные, а лишь предоставляют интерфейс для их получения или изменения.
+5. **Обработка данных в Store**: Маппинг данных в UI-модели, ловля ошибок и управление статусами (loading, error) происходит в SignalStore через `rxMethod`.
+6. **Resource API**: Для декларативного получения данных (GET) рекомендуется использовать `rxResource`, который нативно интегрирован с сигналами и поддерживает автоматическую отмену запросов (`AbortSignal`).
+
+### Пример: Использование в HTML (@if / @else)
+
+Ниже пример того, как Smart-компонент взаимодействует с `UsersStore` из предыдущего раздела, используя современный синтаксис шаблонов Angular.
+
+#### Logic (user-list.component.ts)
+```typescript
+@Component({
+  selector: 'app-user-list',
+  standalone: true,
+  imports: [CommonModule],
+  templateUrl: './user-list.component.html',
+})
+export class UserListComponent {
+  // Инжектим стор — он уже проинициализирован (onInit вызовет loadUsers)
+  protected readonly store = inject(UsersStore);
+}
+```
+
+```html
+<div class="container">
+  @if (store.isLoading()) {
+  <div class="loader">Загрузка пользователей...</div>
+  }
+  @else if (store.users().length > 0) {
+  <ul class="user-list">
+    @for (user of store.users(); track user.id) {
+    <li>{{ user.name }} ({{ user.isActive ? 'Active' : 'Inactive' }})</li>
+    }
+  </ul>
+
+  <div class="stats">
+    Всего активных: {{ store.activeUsers().length }}
+  </div>
+  }
+  @else {
+  <div class="empty-state">
+    Пользователи не найдены.
+  </div>
+  }
+</div>
+```
+
+### Модульная архитектура
+Несмотря на использование standalone компонентов в shared слое, основные страницы приложения организуются с помощью модулей. Это позволяет логически сгруппировать компоненты страницы и обеспечить удобную ленивую загрузку через систему роутинга.
+
+**Основные принципы**
+**Одна страница — один модуль:** Каждая директория в /pages представляет собой законченный функциональный модуль.
+
+**Связка файлов:** В корне папки страницы всегда находится «триада» файлов: основной компонент, модуль и роутинг-модуль.
+
+**Инкапсуляция:** Компоненты, которые используются только внутри данной страницы, располагаются в подпапке /components.
+
+### Структура файлов
+Пример типичной структуры страницы:
+
+```text
+/orders
+├── /components
+│   └── /order-card
+│       ├── order-card.component.ts   # Дочерний компонент
+│       ├── order-card.component.html
+│       └── /model                    # Локальная логика компонента
+├── orders.component.ts               # Точка входа (Smart-компонент)
+├── orders.module.ts                  # Объявление компонентов и импорты
+└── orders-routing.module.ts          # Конфигурация маршрутов страницы
+```
+
+
+Пример оформления модуля:
+
+```typescript
+import { NgModule } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { OrdersComponent } from './orders.component';
+import { OrdersRoutingModule } from './orders-routing.module';
+import { OrderCardComponent } from './components/order-card/order-card.component';
+
+@NgModule({
+  declarations: [
+    OrdersComponent,
+    OrderCardComponent // Все дочерние компоненты страницы
+  ],
+  imports: [
+    CommonModule,
+    OrdersRoutingModule,
+    // Другие необходимые модули или standalone компоненты
+  ]
+})
+export class OrdersModule { }
+```
+
+## Файловая структура
+
+Практически во всех местах идёт разделение по сущностям. Далее по тексту, чтобы не повторяться, фраза **«сущности»** подразумевает набор стандартных папок: `/consts`, `/helpers`, `/guards`, `/types`, `/services` и так далее.
+
+### Корень приложения (`/src/app`)
+
+* **/auth** — Авторизация. Выносится на уровень корня, отдельно от других папок, хоть семантически и относится к `/core`.
+* **/core** — Глобальные конфигурации, синглтон-провайдеры, интерцепторы, резолверы, гварды, валидаторы. Внутри разделяется по «сущностям».
+* **/pages** - Основные страницы приложения.
+* **/services** — Сервисы, которые относятся больше чем к 1 компоненту или к 1 общему модулю.
+* **/shared** — Общие ресурсы, используемые в большинстве ( > 70% ) компонентов. Каждая из них — standalone и должна грузиться лениво. Внутри идёт разделение по «сущностям».
+* **/widgets** — Общие ресурсы, используемые в меньшем ( < 70% ) количестве компонентов. Внутри идёт разделение по «сущностям».
+* **/modals** — Модальные окна. Должны грузиться лениво. Хоть модалки по сути и относятся к shared, они выносятся в отдельную папку.
+* **/store** — Глобальные сторы стейт-менеджера.
+
+### Структура страниц (`/pages`)
+
+Основные модули приложения, где содержатся полноценные страницы, лежат в папке `/pages`.
+
+Каждая страница живёт в своей папке, внутри её родительской папки всегда есть модуль и роутинг. Все дочерние компоненты лежат на уровень ниже. Все «сущности», которые задевают только эту страницу, хранятся с ней же.
+
+**Важное правило для компонентов:** Внутри папки дочерних компонентов (`/components`) папки не бьются по отдельным сущностям. Вместо этого создается единая папка `/model`, в которой лежат все вспомогательные файлы для этого компонента.
+
+#### Пример структуры страницы «Заказы»:
+
+```text
+/pages
+└── /orders                         # Страница «заказов»
+    ├── /consts                     # ... сущности модуля (константы, типы и т.д.)
+    ├── /types
+    │
+    ├── /components                 # Дочерние компоненты модуля
+    │   ├── /model                  # Единая папка для логики компонента
+    │   │   ├── const.ts
+    │   │   ├── types.ts
+    │   │   └── helper.ts
+    │   └── orders-execute.component.ts
+    │
+    ├── orders.component.ts         # Основной компонент страницы
+    ├── orders-routing.module.ts    # Роуты страницы
+    └── orders.module.ts            # Основной модуль страницы (объявление и импорты)
+```
+
+## Генерация API
+
+Для работы с сервером мы не пишем интерфейсы (DTO) и HTTP-сервисы вручную. Вместо этого используется кодогенерация на основе спецификации OpenAPI/Swagger.
+
+В качестве основного инструмента используется библиотека **`ng-openapi-gen`**. Она автоматически читает файл `swagger.yaml` и создает строго типизированные Angular-сервисы и модели.
+
+### Шаги генерации и настройки
+
+**Шаг 1. Конфигурация генератора**
+В корне проекта (или рядом с `package.json`) должен лежать конфигурационный файл `ng-openapi-gen.json`. Он указывает генератору, откуда брать спецификацию и куда складывать готовый код.
+
+```json
+{
+  "$schema": "node_modules/ng-openapi-gen/ng-openapi-gen-schema.json",
+  "input": "src/api/swagger.yaml",
+  "output": "src/app/core/api",
+  "ignoreUnusedModels": false,
+  "module": "ApiModule"
+}
+```
+
+Важно: Папку src/app/core/api необходимо добавить в .gitignore, так как её содержимое является производным от спецификации и перезаписывается при каждой генерации.
+
+**Шаг 2. Настройка npm-скрипта**
+
+Для удобства запуска команда добавляется в файл `package.json` в секцию `scripts`:
+
+```json
+"scripts": {
+  "api:gen": "ng-openapi-gen"
+}
+```
+
+**Шаг 3. Запуск генерации**
+
+При любом изменении файла `swagger.yaml` необходимо выполнить команду в терминале:
+
+```bash
+npm run api:gen
+```
+
+После выполнения скрипта в целевой папке (output) будут созданы модели данных и сервисы для всех эндпоинтов, описанных в Swagger.
+
+
+**Шаг 4. Использование в SignalStore**
+
+Сгенерированные сервисы интегрируются в стор через `rxMethod` для обеспечения реактивного потока данных.
+
+```typescript
+import { inject } from '@angular/core';
+import { patchState } from '@ngrx/signals';
+import { rxMethod } from '@ngrx/signals/rxjs-interop';
+import { pipe, switchMap, tap } from 'rxjs';
+import { OrdersService } from '../../core/api/services/orders.service';
+
+// Интеграция сгенерированного сервиса в методы стора
+export const loadOrders = rxMethod<void>(
+  pipe(
+    switchMap(() => {
+      const ordersService = inject(OrdersService);
+      
+      // Использование типизированного метода из сгенерированного сервиса
+      return ordersService.getOrders({ authFail: false }).pipe(
+        tap((response) => patchState(store, { items: response.items }))
+      );
+    })
+  )
+);
+```
+

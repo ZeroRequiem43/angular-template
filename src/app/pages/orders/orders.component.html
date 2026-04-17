@@ -1,0 +1,38 @@
+<section class="orders-page">
+  <h2>Orders</h2>
+
+  <div>
+    <nav mat-tab-nav-bar [tabPanel]="tabPanel">
+      <a mat-tab-link
+         routerLink="list"
+         routerLinkActive #rla1="routerLinkActive"
+         [active]="rla1.isActive">
+        Список
+      </a>
+
+      <a mat-tab-link
+         routerLink="details"
+         routerLinkActive #rla2="routerLinkActive"
+         [active]="rla2.isActive">
+        Детали
+      </a>
+    </nav>
+
+    <mat-tab-nav-panel #tabPanel>
+      <div class="tab-content-wrapper">
+        <router-outlet></router-outlet>
+      </div>
+    </mat-tab-nav-panel>
+  </div>
+
+  <app-info-badge label="Visible orders" [value]="visibleOrders.length"></app-info-badge>
+
+  <app-orders-toolbar
+    [showOnlyNew]="showOnlyNew"
+    (toggleOnlyNew)="toggleOnlyNew()"
+  ></app-orders-toolbar>
+
+  <app-orders-stats [orders]="visibleOrders"></app-orders-stats>
+  <app-order-list [orders]="visibleOrders"></app-order-list>
+</section>
+

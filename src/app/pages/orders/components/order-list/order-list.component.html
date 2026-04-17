@@ -1,0 +1,13 @@
+@if (orders().length) {
+  <ul class="orders-list">
+    @for (order of orders(); track order.id) {
+      <li class="orders-list__item">
+        <span>#{{ order.id }} - {{ order.client }}</span>
+        <strong>{{ order.total }}</strong>
+      </li>
+    }
+  </ul>
+} @else {
+  <p>No orders available.</p>
+}
+

@@ -1,0 +1,39 @@
+{
+  "printWidth": 100,
+  "tabWidth": 2,
+  "useTabs": false,
+  "singleQuote": true,
+  "trailingComma": "all",
+  "bracketSpacing": true,
+  "arrowParens": "always",
+  "semi": true,
+  "overrides": [
+    {
+      "files": "*.html",
+      "options": {
+        "parser": "angular",
+        "printWidth": 120,
+        "bracketSameLine": true,
+        "htmlWhitespaceSensitivity": "ignore"
+      }
+    },
+    {
+      "files": ["*.component.ts"],
+      "options": {
+        "printWidth": 120
+      }
+    }
+  ],
+  "plugins": ["@ianvs/prettier-plugin-sort-imports"],
+  "importOrder": [
+    "<BUILTIN_MODULES>",
+    "^@angular/(.*)$",
+    "^rxjs(.*)$",
+    "^@ngrx/(.*)$",
+    "<THIRD_PARTY_MODULES>",
+    "^@(core|shared|features|auth|pages|widgets|modals|services)/(.*)$",
+    "^[../]",
+    "^[./]"
+  ],
+  "importOrderParserPlugins": ["typescript", "decorators-legacy"]
+}

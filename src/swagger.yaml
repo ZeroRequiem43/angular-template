@@ -1,0 +1,258 @@
+openapi: 3.0.0
+info:
+  title: Fake Dashboard API
+  version: 1.0.0
+  description: Спецификация для автоматической генерации Angular API клиента.
+
+tags:
+  - name: Users
+    description: Операции с пользователями
+  - name: Orders
+    description: Операции с заказами
+
+paths:
+  /users:
+    get:
+      tags:
+        - Users
+      summary: Получить список пользователей
+      operationId: getUsers
+      parameters:
+        - name: name
+          in: query
+          description: Часть имени для поиска
+          required: false
+          schema:
+            type: string
+        - name: role
+          in: query
+          description: Фильтр по роли
+          required: false
+          schema:
+            type: string
+        - name: fail
+          in: query
+          description: Флаг для искусственного вызова ошибки (для тестов)
+          required: false
+          schema:
+            type: boolean
+        - name: authFail
+          in: query
+          description: Флаг для искусственного вызова 401 ошибки (для тестов)
+          required: false
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsersResponse'
+
+  /orders:
+    get:
+      tags:
+        - Orders
+      summary: Получить список заказов (сделок)
+      operationId: getOrders
+      parameters:
+        - name: fail
+          in: query
+          description: Флаг для искусственного вызова ошибки (для тестов)
+          required: false
+          schema:
+            type: boolean
+        - name: authFail
+          in: query
+          description: Флаг для искусственного вызова 401 ошибки (для тестов)
+          required: false
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Успешный ответ со списком заказов
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrdersResponse'
+
+    post:
+      tags:
+        - Orders
+      summary: Создать новый заказ
+      operationId: createOrder
+      requestBody:
+        description: Данные для создания нового заказа (сущность описана inline)
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - company_name
+                - amount
+              properties:
+                company_name:
+                  type: string
+                  description: Название компании
+                  example: "NewTech LLC"
+                amount:
+                  type: number
+                  format: float
+                  description: Сумма заказа
+                  example: 1500.50
+                type:
+                  type: string
+                  enum: [UP, DOWN]
+                  description: Тип сделки
+                  example: "UP"
+      responses:
+        '201':
+          description: Заказ успешно создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDto'
+
+components:
+  schemas:
+    # ==========================================
+    # DOMAIN: USERS
+    # ==========================================
+    UsersResponse:
+      type: object
+      required:
+        - meta
+        - data
+      properties:
+        meta:
+          $ref: '#/components/schemas/UsersMeta'
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserDto'
+
+    UsersMeta:
+      type: object
+      required:
+        - timestamp
+        - total_records
+        - page
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        total_records:
+          type: integer
+          example: 4
+        page:
+          type: integer
+          example: 1
+
+    UserDto:
+      type: object
+      required:
+        - user_internal_id
+        - first_name
+        - last_name
+        - access_role
+        - last_login
+        - is_active
+      properties:
+        user_internal_id:
+          type: integer
+          example: 1
+        first_name:
+          type: string
+          example: "Alex"
+        last_name:
+          type: string
+          example: "Ivanov"
+        access_role:
+          type: string
+          enum: [admin, manager, user]
+          example: "admin"
+        last_login:
+          type: string
+          format: date-time
+        is_active:
+          type: boolean
+          example: true
+
+    # ==========================================
+    # DOMAIN: ORDERS
+    # ==========================================
+    OrdersResponse:
+      type: object
+      required:
+        - pagination
+        - items
+      properties:
+        pagination:
+          $ref: '#/components/schemas/OrderPagination'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderDto'
+
+    OrderPagination:
+      type: object
+      required:
+        - current
+        - limit
+      properties:
+        current:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 10
+
+    OrderDto:
+      type: object
+      required:
+        - transaction_id
+        - company
+        - financials
+        - workflow_state
+      properties:
+        transaction_id:
+          type: integer
+          example: 1001
+        company:
+          $ref: '#/components/schemas/CompanyDto'
+        financials:
+          $ref: '#/components/schemas/FinancialsDto'
+        workflow_state:
+          type: string
+          enum: [NEW, DONE, IN_PROGRESS, CANCELLED]
+          example: "NEW"
+
+    CompanyDto:
+      type: object
+      required:
+        - name
+        - tier
+      properties:
+        name:
+          type: string
+          example: "Acme Corp"
+        tier:
+          type: string
+          enum: [startup, mid-market, enterprise]
+          example: "enterprise"
+
+    FinancialsDto:
+      type: object
+      required:
+        - gross_amount
+        - currency
+      properties:
+        gross_amount:
+          type: number
+          format: float
+          example: 1250.00
+        currency:
+          type: string
+          example: "USD"

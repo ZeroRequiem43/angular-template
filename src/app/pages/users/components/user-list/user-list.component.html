@@ -1,0 +1,13 @@
+@if (users().length) {
+  <ul class="users-list">
+    @for (user of users(); track user.id) {
+      <li class="users-list__item">
+        <strong>{{ user.name }}</strong>
+        <span>{{ user.role }}</span>
+      </li>
+    }
+  </ul>
+} @else {
+  <p>Пользователи не найдены.</p>
+}
+

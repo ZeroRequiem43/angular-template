@@ -1,0 +1,29 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "env": {
+    "browser": true,
+    "es2022": true
+  },
+  "plugins": ["typescript"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "restriction": "warn",
+    "perf": "warn"
+  },
+  "rules": {
+    "@typescript-eslint/no-extraneous-class": ["error", { "allowWithDecorator": true }],
+    "@typescript-eslint/explicit-function-return-type": "off",
+    "eslint/no-void": "off",
+    "eslint/no-unused-vars": "warn"
+  },
+  "ignorePatterns": ["dist/**", "out-tsc/**", "coverage/**", "node_modules/**", ".angular/**"],
+  "overrides": [
+    {
+      "files": ["**/*.spec.ts"],
+      "env": {
+        "node": true
+      }
+    }
+  ]
+}

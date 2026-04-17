@@ -1,0 +1,28 @@
+<section class="users-page">
+  <h2>Пользователи</h2>
+  <app-info-badge label="Найденые пользователи" [value]="filteredUsers().length"></app-info-badge>
+
+  <div class="users-page__search">
+    <span>Найти пользователя:</span>
+    <input [value]="search()" (input)="onSearchChange($event)" placeholder="Поиск по имени" />
+  </div>
+
+  <button (click)="openModal()">Open Modal</button>
+  <button (click)="callApiWithError()">Drop error</button>
+  <button (click)="callApiWithAuthError()">Drop auth error</button>
+  <button (click)="resetError()">Reload</button>
+
+  @if (store.isLoading()) {
+    <div>Загрузка пользователей...</div>
+  } @else if (store.error()) {
+    <div>
+      <p>Произошла ошибка при загрузке</p>
+      <pre>{{ store.error() }}</pre>
+    </div>
+  } @else {
+    <app-user-list [users]="filteredUsers()"></app-user-list>
+  }
+
+
+</section>
+
