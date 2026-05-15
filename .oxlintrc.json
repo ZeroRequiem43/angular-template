@@ -14,6 +14,7 @@
   "rules": {
     "@typescript-eslint/no-extraneous-class": ["error", { "allowWithDecorator": true }],
     "@typescript-eslint/explicit-function-return-type": "off",
+    "typescript/no-invalid-void-type": "off",
     "eslint/no-void": "off",
     "eslint/no-unused-vars": "warn"
   },
